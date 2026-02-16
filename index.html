@@ -41,6 +41,9 @@
         
         .alert-data { background: #ff7675; color: white; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 10px; font-weight: bold; display: none; }
         .btn-tabela { padding: 4px 6px; border: none; border-radius: 4px; color: white; cursor: pointer; margin: 2px; font-size: 10px; }
+        
+        .card-obra { background: #fff; border-left: 5px solid var(--secondary); padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 4px; }
+        
         footer { position: fixed; bottom: 0; left: 0; width: 100%; background: #fff; text-align: center; padding: 10px 0; font-size: 10px; border-top: 1px solid #eee; }
     </style>
 </head>
@@ -171,21 +174,61 @@
         const qId = document.getElementById('sel_q_ativa').value;
         const dtLocal = getDataLocalISO();
         if(!qId) return alert("Selecione uma quinzena ativa!");
+        
         db.lancamentos[qId] = db.lancamentos[qId] || {};
-        db.lancamentos[qId][dtLocal] = db.funcionarios.map((f, i) => ({
-            m: document.getElementById(`m_${i}`).value,
-            t: document.getElementById(`t_${i}`).value,
-            hev: document.getElementById(`hev_${i}`).value,
-            heo: document.getElementById(`heo_${i}`).value
-        }));
+        const registrosHoje = {};
+        
+        db.funcionarios.forEach((f, i) => {
+            registrosHoje[f.id] = {
+                m: document.getElementById(`m_${i}`).value,
+                t: document.getElementById(`t_${i}`).value,
+                hev: document.getElementById(`hev_${i}`).value,
+                heo: document.getElementById(`heo_${i}`).value
+            };
+        });
+        
+        db.lancamentos[qId][dtLocal] = registrosHoje;
         localStorage.setItem('l', JSON.stringify(db.lancamentos));
         alert(`Sucesso! Ponto salvo em ${dtLocal}`);
+    }
+
+    function atualizarPontoHoje() {
+        const dt = new Date();
+        const dtISO = getDataLocalISO();
+        const qId = document.getElementById('sel_q_ativa').value;
+        
+        // Busca lançamentos já existentes para hoje
+        const hojeSalvo = db.lancamentos[qId]?.[dtISO] || {};
+
+        document.getElementById('header_hoje').innerText = dt.toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+        
+        let html = "";
+        db.funcionarios.forEach((f, i) => {
+            const l = hojeSalvo[f.id] || {m:'', t:'', hev:'', heo:''};
+            
+            html += `<tr><td class="col-nome">${f.nome}<br><small>R$ ${f.valor}</small></td>
+                <td>${gerarSelObra(`m_${i}`, l.m)}</td>
+                <td>${gerarSelObra(`t_${i}`, l.t)}</td>
+                <td><input type="number" class="input-mini" id="hev_${i}" step="0.5" value="${l.hev}"></td>
+                <td>${gerarSelObra(`heo_${i}`, l.heo)}</td></tr>`;
+        });
+        document.getElementById('corpo_hoje').innerHTML = html;
+    }
+
+    function gerarSelObra(id, valorPreenchido = "") {
+        let s = `<select id="${id}" style="width:65px; font-size:10px"><option value=""></option>`;
+        db.obras.forEach(o => {
+            let sel = (o.sigla === valorPreenchido) ? "selected" : "";
+            s += `<option value="${o.sigla}" ${sel}>${o.sigla}</option>`;
+        });
+        return s + `</select>`;
     }
 
     function renderRelatorio() {
         const qId = document.getElementById('sel_rel_q').value;
         const q = db.quinzenas.find(x => x.id == qId);
         if(!q) return;
+        
         let dias = []; 
         let d = new Date(q.inicio + "T00:00:00");
         let df = new Date(q.fim + "T00:00:00");
@@ -197,18 +240,20 @@
         dias.forEach(() => h += `<th>M</th><th>T</th><th>HE</th><th>OB</th>`);
         h += `<th></th></tr></thead><tbody>`;
 
-        db.funcionarios.forEach((f, fIdx) => {
+        db.funcionarios.forEach((f) => {
             let sD = 0, vHE = 0;
             h += `<tr><td class="col-nome">${f.nome}</td>`;
             dias.forEach(dia => {
                 const dt = `${dia.getFullYear()}-${String(dia.getMonth() + 1).padStart(2, '0')}-${String(dia.getDate()).padStart(2, '0')}`;
-                const l = db.lancamentos[qId]?.[dt]?.[fIdx] || {m:'', t:'', hev:'', heo:''};
+                const l = db.lancamentos[qId]?.[dt]?.[f.id] || {m:'', t:'', hev:'', heo:''};
+                
                 sD += (l.m?0.5:0) + (l.t?0.5:0);
                 vHE += calcularValorHE(f.valor, l.hev);
-                h += `<td><input class="input-mini r-inp" data-q="${qId}" data-d="${dt}" data-f="${fIdx}" data-field="m" value="${l.m}"></td>
-                      <td><input class="input-mini r-inp" data-q="${qId}" data-d="${dt}" data-f="${fIdx}" data-field="t" value="${l.t}"></td>
-                      <td><input class="input-mini r-inp" data-q="${qId}" data-d="${dt}" data-f="${fIdx}" data-field="hev" value="${l.hev}"></td>
-                      <td><input class="input-mini r-inp" data-q="${qId}" data-d="${dt}" data-f="${fIdx}" data-field="heo" value="${l.heo}"></td>`;
+                
+                h += `<td><input class="input-mini r-inp" data-q="${qId}" data-d="${dt}" data-f="${f.id}" data-field="m" value="${l.m}"></td>
+                      <td><input class="input-mini r-inp" data-q="${qId}" data-d="${dt}" data-f="${f.id}" data-field="t" value="${l.t}"></td>
+                      <td><input class="input-mini r-inp" data-q="${qId}" data-d="${dt}" data-f="${f.id}" data-field="hev" value="${l.hev}"></td>
+                      <td><input class="input-mini r-inp" data-q="${qId}" data-d="${dt}" data-f="${f.id}" data-field="heo" value="${l.heo}"></td>`;
             });
             h += `<td class="total-final">R$ ${((sD * (f.valor || 0)) + vHE).toFixed(2)}</td></tr>`;
         });
@@ -220,7 +265,8 @@
         document.querySelectorAll('.r-inp').forEach(inp => {
             const { q, d, f, field } = inp.dataset;
             if(!db.lancamentos[q]) db.lancamentos[q] = {};
-            if(!db.lancamentos[q][d]) db.lancamentos[q][d] = db.funcionarios.map(() => ({m:'', t:'', hev:'', heo:''}));
+            if(!db.lancamentos[q][d]) db.lancamentos[q][d] = {};
+            if(!db.lancamentos[q][d][f]) db.lancamentos[q][d][f] = {m:'', t:'', hev:'', heo:''};
             db.lancamentos[q][d][f][field] = inp.value;
         });
         localStorage.setItem('l', JSON.stringify(db.lancamentos));
@@ -233,19 +279,6 @@
         const q = db.quinzenas.find(x => x.id == qId);
         const dtLocal = getDataLocalISO();
         document.getElementById('alerta_data').style.display = (q && (dtLocal < q.inicio || dtLocal > q.fim)) ? 'block' : 'none';
-    }
-
-    function atualizarPontoHoje() {
-        const dt = new Date();
-        document.getElementById('header_hoje').innerText = dt.toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
-        let html = "";
-        db.funcionarios.forEach((f, i) => {
-            html += `<tr><td class="col-nome">${f.nome}<br><small>R$ ${f.valor}</small></td>
-                <td>${gerarSelObra(`m_${i}`)}</td><td>${gerarSelObra(`t_${i}`)}</td>
-                <td><input type="number" class="input-mini" id="hev_${i}" step="0.5"></td>
-                <td>${gerarSelObra(`heo_${i}`)}</td></tr>`;
-        });
-        document.getElementById('corpo_hoje').innerHTML = html;
     }
 
     function salvarGeral(tipo) {
@@ -304,32 +337,28 @@
         const qId = document.getElementById('sel_resumo_q').value;
         let resumo = {}; db.obras.forEach(o => resumo[o.sigla] = 0);
         Object.values(db.lancamentos[qId] || {}).forEach(dia => {
-            dia.forEach((l, fIdx) => {
-                const f = db.funcionarios[fIdx];
+            for(let fId in dia) {
+                const l = dia[fId];
+                const f = db.funcionarios.find(x => x.id == fId);
+                if(!f) continue;
                 if(l.m) resumo[l.m] = (resumo[l.m] || 0) + (f.valor/2);
                 if(l.t) resumo[l.t] = (resumo[l.t] || 0) + (f.valor/2);
                 if(l.hev && l.heo) resumo[l.heo] = (resumo[l.heo] || 0) + calcularValorHE(f.valor, l.hev);
-            });
+            }
         });
         let html = "";
         for(let obra in resumo) html += `<div class="card-obra"><span><strong>${obra}</strong></span> <span>R$ ${resumo[obra].toFixed(2)}</span></div>`;
         document.getElementById('container_resumo_obra').innerHTML = html || "Sem lançamentos nesta quinzena.";
     }
 
-    function gerarSelObra(id) {
-        let s = `<select id="${id}" style="width:65px; font-size:10px"><option value=""></option>`;
-        db.obras.forEach(o => s += `<option value="${o.sigla}">${o.sigla}</option>`);
-        return s + `</select>`;
-    }
-
     function enviarWhatsApp() {
         const qId = document.getElementById('sel_rel_q').value;
         const q = db.quinzenas.find(x => x.id == qId);
         let msg = `*DELTA ENGENHARIA - FECHAMENTO*\n*Período: ${q.nome}*\n\n`;
-        db.funcionarios.forEach((f, fIdx) => {
+        db.funcionarios.forEach((f) => {
             let sD = 0, vHE = 0;
             Object.values(db.lancamentos[qId] || {}).forEach(dia => {
-                const l = dia[fIdx]; if(l){ sD += (l.m?0.5:0) + (l.t?0.5:0); vHE += calcularValorHE(f.valor, l.hev); }
+                const l = dia[f.id]; if(l){ sD += (l.m?0.5:0) + (l.t?0.5:0); vHE += calcularValorHE(f.valor, l.hev); }
             });
             msg += `👤 *${f.nome}*\n💰 Total: R$ ${((sD * f.valor) + vHE).toFixed(2)}\n🔑 PIX: ${f.pix}\n\n`;
         });
