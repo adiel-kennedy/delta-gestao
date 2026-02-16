@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Delta Engenharia - Gestão de Obras</title>
     
+    <link rel="icon" type="image/png" href="icone_delta.png">
+    <link rel="apple-touch-icon" href="icone_delta.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1a2a3a">
@@ -136,7 +138,7 @@
     <input type="file" id="input_backup" style="display:none" onchange="importarBackup(this)">
 </div>
 
-<footer>Delta Engenharia - Gestão v2.5</footer>
+<footer>Delta Engenharia - Gestão v2.6</footer>
 
 <script>
     let db = {
@@ -168,8 +170,7 @@
     function salvarPontoHoje() {
         const qId = document.getElementById('sel_q_ativa').value;
         const dtLocal = getDataLocalISO();
-        if(!qId) return alert("Crie/Selecione uma quinzena!");
-
+        if(!qId) return alert("Selecione uma quinzena ativa!");
         db.lancamentos[qId] = db.lancamentos[qId] || {};
         db.lancamentos[qId][dtLocal] = db.funcionarios.map((f, i) => ({
             m: document.getElementById(`m_${i}`).value,
@@ -178,14 +179,13 @@
             heo: document.getElementById(`heo_${i}`).value
         }));
         localStorage.setItem('l', JSON.stringify(db.lancamentos));
-        alert(`Ponto salvo: ${dtLocal}`);
+        alert(`Sucesso! Ponto salvo em ${dtLocal}`);
     }
 
     function renderRelatorio() {
         const qId = document.getElementById('sel_rel_q').value;
         const q = db.quinzenas.find(x => x.id == qId);
         if(!q) return;
-
         let dias = []; 
         let d = new Date(q.inicio + "T00:00:00");
         let df = new Date(q.fim + "T00:00:00");
@@ -225,7 +225,7 @@
         });
         localStorage.setItem('l', JSON.stringify(db.lancamentos));
         renderRelatorio();
-        alert("Alterações salvas!");
+        alert("Planilha de fechamento atualizada!");
     }
 
     function verificarDataQuinzena() {
@@ -255,7 +255,6 @@
         if(tipo==='funcionarios'){ obj.nome=document.getElementById('f_nome').value; obj.pix=document.getElementById('f_pix').value; obj.valor=document.getElementById('f_valor').value; }
         else if(tipo==='obras'){ obj.nome=document.getElementById('o_nome').value; obj.sigla=document.getElementById('o_sigla').value; }
         else { obj.nome=document.getElementById('q_nome').value; obj.inicio=document.getElementById('q_ini').value; obj.fim=document.getElementById('q_fim').value; }
-        
         let list = db[tipo];
         let idx = list.findIndex(x => x.id == obj.id);
         if(idx===-1) list.push(obj); else list[idx]=obj;
@@ -265,16 +264,9 @@
 
     function renderTabelasCadastros() {
         const btn = (t, id) => `<button class="btn-tabela" style="background:var(--warning)" onclick="carregarEdicao('${t}',${id})">E</button><button class="btn-tabela" style="background:var(--danger)" onclick="excluir('${t}',${id})">X</button>`;
-        
-        // COLUNA PIX RESTAURADA NA TABELA
-        document.getElementById('lista_f_tab').innerHTML = `<table><tr><th>Nome</th><th>PIX</th><th>R$</th><th>Ações</th></tr>` + 
-            db.funcionarios.map(f => `<tr><td style="text-align:left">${f.nome}</td><td>${f.pix}</td><td>${f.valor}</td><td>${btn('f',f.id)}</td></tr>`).join('') + `</table>`;
-        
-        document.getElementById('lista_o_tab').innerHTML = `<table><tr><th>Sigla</th><th>Ações</th></tr>` + 
-            db.obras.map(o => `<tr><td>${o.sigla}</td><td>${btn('o',o.id)}</td></tr>`).join('') + `</table>`;
-
-        document.getElementById('lista_q_tab').innerHTML = `<table><tr><th>Quinzena</th><th>Período</th><th>Ações</th></tr>` + 
-            db.quinzenas.map(q => `<tr><td>${q.nome}</td><td>${q.inicio} / ${q.fim}</td><td>${btn('q',q.id)}</td></tr>`).join('') + `</table>`;
+        document.getElementById('lista_f_tab').innerHTML = `<table><tr><th>Nome</th><th>PIX</th><th>R$</th><th>Ações</th></tr>` + db.funcionarios.map(f => `<tr><td>${f.nome}</td><td>${f.pix}</td><td>${f.valor}</td><td>${btn('f',f.id)}</td></tr>`).join('') + `</table>`;
+        document.getElementById('lista_o_tab').innerHTML = `<table><tr><th>Sigla</th><th>Ações</th></tr>` + db.obras.map(o => `<tr><td>${o.sigla}</td><td>${btn('o',o.id)}</td></tr>`).join('') + `</table>`;
+        document.getElementById('lista_q_tab').innerHTML = `<table><tr><th>Quinzena</th><th>Período</th><th>Ações</th></tr>` + db.quinzenas.map(q => `<tr><td>${q.nome}</td><td>${q.inicio} / ${q.fim}</td><td>${btn('q',q.id)}</td></tr>`).join('') + `</table>`;
     }
 
     function carregarEdicao(t, id) {
@@ -286,7 +278,7 @@
     }
 
     function excluir(t, id) {
-        if(confirm("Deseja excluir?")){
+        if(confirm("Deseja realmente excluir este registro?")){
             const tipos = { f: 'f', o: 'o', q: 'q' };
             const tipoDb = { f: 'funcionarios', o: 'obras', q: 'quinzenas' };
             db[tipoDb[t]] = db[tipoDb[t]].filter(x => x.id != id);
@@ -321,7 +313,7 @@
         });
         let html = "";
         for(let obra in resumo) html += `<div class="card-obra"><span><strong>${obra}</strong></span> <span>R$ ${resumo[obra].toFixed(2)}</span></div>`;
-        document.getElementById('container_resumo_obra').innerHTML = html || "Sem lançamentos.";
+        document.getElementById('container_resumo_obra').innerHTML = html || "Sem lançamentos nesta quinzena.";
     }
 
     function gerarSelObra(id) {
@@ -359,9 +351,8 @@
         XLSX.writeFile(wb, `DELTA_GERAL_${getDataLocalISO()}.xlsx`);
     }
 
-    // FUNÇÃO DE EXPORTAÇÃO PIX RESTAURADA
     function exportarDiaristas() {
-        let ws_data = [["NOME DO DIARISTA", "CHAVE PIX", "VALOR DIÁRIA BASE"]];
+        let ws_data = [["NOME DO DIARISTA", "CHAVE PIX", "VALOR DIÁRIA"]];
         db.funcionarios.forEach(f => ws_data.push([f.nome, f.pix, f.valor]));
         let wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws_data), "Lista PIX");
